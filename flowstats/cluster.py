@@ -1,0 +1,441 @@
+"""
+Created on Oct 30, 2009
+
+@author: jolly
+"""
+
+from numpy import zeros, outer, sum, eye, array, mean, cov, vstack, std, ones
+from numpy.random import multivariate_normal as mvn
+from numpy.random import seed
+
+from dpmix import DPNormalMixture, BEM_DPNormalMixture, HDPNormalMixture
+
+from dp_cluster import DPCluster, DPMixture, HDPMixture
+
+
+class DPMixtureModel(object):
+    """
+    Fits a Dirichlet process (DP) mixture model to a Numpy data set.
+    """
+
+    def __init__(
+            self,
+            n_clusters,
+            n_iterations=1000,
+            burn_in=100,
+            last=None,
+            model='mcmc'):
+        """
+        n_clusters = number of clusters to fit
+        n_iterations = number of MCMC iterations to sample
+        burn_in = number of MCMC burn-in iterations
+        last = number of MCMC iterations to draw samples from
+               (if None, last = n_iterations)
+        """
+        self.n_clusters = n_clusters
+        self.n_iterations = n_iterations
+        self.burn_in = burn_in
+        self.last = last
+        self.model = model
+
+        self.data = None
+        self.cdp = None
+        self._run = None
+
+        self.gamma_0 = 10
+        self.m_0 = None
+        self.alpha_0 = 1
+        self.nu_0 = None
+        self.phi_0 = None
+
+        self.prior_mu = None
+        self.prior_sigma = None
+        self.prior_pi = None
+
+        self.e0 = 5
+        self.f0 = 0.1
+
+        self._prior_mu = None
+        self._prior_pi = None
+        self._prior_sigma = None
+        self._ref = None
+
+        self._load_mu = None
+        self._load_sigma = None
+        self._load_pi = None
+
+        self.mu_d = None
+
+        self.m = None
+        self.s = None
+        self.d = None
+        self.n = None
+
+        self.seed = None
+
+        self.device = None
+
+        self.identity = False
+        self.parallel = False
+
+    def load_mu(self, mu):
+        if len(mu.shape) > 2:
+            raise ValueError('Shape of Mu is wrong')
+        if len(mu.shape) == 2:
+            (n, d) = mu.shape
+        else:
+            n = 1
+            d = mu.shape[0]
+        if n > self.n_clusters:
+            raise ValueError(
+                'Number of proposed Mus grater then number of clusters')
+
+        self.prior_mu = mu
+        self.mu_d = d
+        self._load_mu = True
+
+    def _load_mu_at_fit(self):
+        (n, d) = self.prior_mu.shape
+        if d != self.d:
+            raise ValueError('Dimension mismatch between Mus and Data')
+
+        elif n < self.n_clusters:
+            self._prior_mu = zeros((self.n_clusters, self.d))
+            self._prior_mu[0:n, :] = (self.prior_mu.copy() - self.m) / self.s
+            self._prior_mu[n:, :] = mvn(zeros((self.d,)), eye(self.d),
+                                        self.n_clusters - n)
+        else:
+            self._prior_mu = (self.prior_mu.copy() - self.m) / self.s
+
+    def load_sigma(self, sigma):
+        n, _ = sigma.shape[0:2]
+        if len(sigma.shape) > 3:
+            raise ValueError('Shape of Sigma is wrong')
+
+        if len(sigma.shape) == 2:
+            sigma = array(sigma)
+
+        if sigma.shape[1] != sigma.shape[2]:
+            raise ValueError("Sigmas must be square matrices")
+
+        if n > self.n_clusters:
+            raise ValueError(
+                'Number of proposed Sigmas grater then number of clusters')
+
+        self._load_sigma = True
+        self.prior_sigma = sigma
+
+    def _load_sigma_at_fit(self):
+        n, d = self.prior_sigma.shape[0:2]
+
+        if d != self.d:
+            raise ValueError('Dimension mismatch between Sigmas and Data')
+
+        elif n < self.n_clusters:
+            self._prior_sigma = zeros((self.n_clusters, self.d, self.d))
+            self._prior_sigma[0:n, :, :] = (self.prior_sigma.copy()) / outer(
+                self.s, self.s)
+            for i in range(n, self.n_clusters):
+                self._prior_sigma[i, :, :] = eye(self.d)
+        else:
+            self._prior_sigma = (self.prior_sigma.copy()) / outer(self.s,
+                                                                  self.s)
+
+    def load_pi(self, pi):
+        tmp = array(pi)
+        if len(tmp.shape) != 1:
+            raise ValueError("Shape of pi is wrong")
+        n = tmp.shape[0]
+        if n > self.n_clusters:
+            raise ValueError(
+                'Number of proposed Pis greater then number of clusters')
+
+        if sum(tmp) > 1:
+            raise ValueError('Proposed Pis sum to more than 1')
+        if n < self.n_clusters:
+            self._prior_pi = zeros(self.n_clusters)
+            self._prior_pi[0:n] = tmp
+            left = (1.0 - sum(tmp)) / (self.n_clusters - n)
+            for i in range(n, self.n_clusters):
+                self._prior_pi[i] = left
+        else:
+            self._prior_pi = tmp
+
+        self._load_pi = True
+
+    def load_ref(self, ref):
+        self._ref = ref
+
+    def _load_ref_at_fit(self, points):
+        if isinstance(self._ref, DPMixture):
+            self.prior_mu = self._ref.mus
+            self.prior_sigma = self._ref.sigmas
+            self.prior_pi = self._ref.pis
+        else:
+            self.prior_mu = zeros((self.n_clusters, points.shape[1]))
+            self.prior_sigma = zeros(
+                (self.n_clusters, points.shape[1], points.shape[1]))
+            for i in range(self.n_clusters):
+                try:
+                    self.prior_mu[i] = mean(points[self._ref == i], 0)
+                    self.prior_sigma[i] = cov(points[self._ref == i], rowvar=0)
+                except Exception, e:
+                    print e
+                    self.prior_mu[i] = zeros(points.shape[1])
+                    self.prior_sigma[i] = eye(points.shape[1])
+
+            tot = float(points.shape[0])
+            self.prior_pi = array(
+                [
+                    points[self._ref == i].shape[0] / tot for i in
+                    range(self.n_clusters)
+                ]
+            )
+
+    def fit(self, data, verbose=False, normed=False):
+        if isinstance(data, list) or isinstance(data, tuple):
+            return [self._fit(i, verbose, normed) for i in data]
+        else:
+            return self._fit(data, verbose, normed)
+
+    def _fit(self, data, verbose=False, normed=False):
+        """
+        Fit the mixture model to the data
+        use get_results() to get the fitted model
+        """
+        points = data.copy().astype('double')
+        if normed:
+            self.data = points
+            self.m = zeros(self.data.shape[1])
+            self.s = ones(self.data.shape[1])
+        else:
+            self.m = points.mean(0)
+            self.s = points.std(0)
+            # in case any of the std's are zero
+            self.s[self.s == 0] = 1
+            self.data = (points - self.m) / self.s
+
+        if len(self.data.shape) == 1:
+            self.data = self.data.reshape((self.data.shape[0], 1))
+
+        if len(self.data.shape) != 2:
+            raise ValueError("points array is the wrong shape")
+        self.n, self.d = self.data.shape
+
+        if self._ref is not None:
+            self.identity = True
+            self._load_ref_at_fit(points)
+
+        if self.prior_mu is not None:
+            self._load_mu_at_fit()
+        if self.prior_sigma is not None:
+            self._load_sigma_at_fit()
+
+        if self.seed is not None:
+            seed(self.seed)
+        else:
+            from datetime import datetime
+
+            seed(datetime.now().microsecond)
+
+        #TODO move hyperparameter settings here
+        if self.model.lower() == 'bem':
+            self.cdp = BEM_DPNormalMixture(
+                self.data,
+                ncomp=self.n_clusters,
+                gamma0=self.gamma_0,
+                m0=self.m_0,
+                nu0=self.nu_0,
+                Phi0=self.phi_0,
+                e0=self.e0,
+                f0=self.f0,
+                mu0=self._prior_mu,
+                Sigma0=self._prior_sigma,
+                weights0=self._prior_pi,
+                alpha0=self.alpha_0,
+                gpu=self.device,
+                parallel=self.parallel,
+                verbose=verbose)
+            self.cdp.optimize(self.n_iterations)
+        else:
+            self.cdp = DPNormalMixture(
+                self.data,
+                ncomp=self.n_clusters,
+                gamma0=self.gamma_0,
+                m0=self.m_0,
+                nu0=self.nu_0,
+                Phi0=self.phi_0,
+                e0=self.e0,
+                f0=self.f0,
+                mu0=self._prior_mu,
+                Sigma0=self._prior_sigma,
+                weights0=self._prior_pi,
+                alpha0=self.alpha_0,
+                gpu=self.device,
+                parallel=self.parallel,
+                verbose=verbose)
+            self.cdp.sample(
+                niter=self.n_iterations,
+                nburn=self.burn_in,
+                thin=1,
+                ident=self.identity)
+
+        if self.last is None:
+            self.last = self.n_iterations
+
+        self._run = True  # we've fit the mixture model
+
+        return self.get_results()
+
+    def get_results(self):
+        """
+        get the results of the fitted mixture model
+        """
+        if self._run:
+            if self.model.lower() == 'bem':
+                results = []
+                for j in range(self.n_clusters):
+                    tmp = DPCluster(
+                        self.cdp.weights[j],
+                        (self.cdp.mu[j] * self.s) + self.m,
+                        self.cdp.Sigma[j] * outer(self.s, self.s),
+                        self.cdp.mu[j],
+                        self.cdp.Sigma[j]
+                    )
+                    results.append(tmp)
+                tmp = DPMixture(results, self.m, self.s)
+            else:
+                results = []
+                for i in range(self.last):
+                    for j in range(self.n_clusters):
+                        tmp = DPCluster(
+                            self.cdp.weights[-(i + 1), j],
+                            (self.cdp.mu[-(i + 1), j] * self.s) + self.m,
+                            self.cdp.Sigma[-(i + 1), j] * outer(self.s, self.s),
+                            self.cdp.mu[-(i + 1), j],
+                            self.cdp.Sigma[-(i + 1), j]
+                        )
+                        results.append(tmp)
+                tmp = DPMixture(
+                    results,
+                    self.last,
+                    self.m,
+                    self.s,
+                    self.identity)
+            return tmp
+        else:
+            return None  # TODO raise exception
+
+    def get_class(self):
+        """
+        Get the last classification from the model
+        """
+
+        if self._run:
+            return self.cdp.getK(self.n)
+        else:
+            return None  # TODO raise exception
+
+
+class HDPMixtureModel(DPMixtureModel):
+    """
+    n_clusters = number of clusters to fit
+    n_iterations = number of MCMC iterations
+    burn_in = number of MCMC burn-in iterations
+    last = number of MCMC iterations to draw samples from.
+           (if None, last = n_iterations)
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(HDPMixtureModel, self).__init__(*args, **kwargs)
+        self.g0 = 0.1
+        self.h0 = 0.1
+
+        self.n_data_sets = None
+        self.hdp = None
+
+    def fit(self, data_sets, verbose=False, tune_interval=100):
+        self.d = data_sets[0].shape[1]
+
+        data_sets = [i.copy().astype('double') for i in data_sets]
+        self.n_data_sets = len(data_sets)
+        total_data = vstack(data_sets)
+        self.m = mean(total_data, 0)
+        self.s = std(total_data, 0)
+        standardized = []
+        for i in data_sets:
+            if i.shape[1] != self.d:
+                raise RuntimeError("Shape of data sets do not match")
+            standardized.append(((i - self.m) / self.s))
+
+        if self.prior_mu is not None:
+            self._load_mu_at_fit()
+        if self.prior_sigma is not None:
+            self._load_sigma_at_fit()
+
+        if self.seed is not None:
+            seed(self.seed)
+        else:
+            from datetime import datetime
+            seed(datetime.now().microsecond)
+
+        self.hdp = HDPNormalMixture(
+            standardized,
+            ncomp=self.n_clusters,
+            gamma0=self.gamma_0,
+            m0=self.m_0,
+            nu0=self.nu_0,
+            Phi0=self.phi_0,
+            e0=self.e0,
+            f0=self.f0,
+            g0=self.g0,
+            h0=self.h0,
+            mu0=self._prior_mu,
+            Sigma0=self._prior_sigma,
+            weights0=self._prior_pi,
+            alpha0=self.alpha_0,
+            gpu=self.device,
+            parallel=self.parallel,
+            verbose=verbose)
+        self.hdp.sample(
+            niter=self.n_iterations,
+            nburn=self.burn_in,
+            thin=1,
+            ident=self.identity,
+            tune_interval=tune_interval)
+
+        self._run = True  # we've fit the mixture model
+
+        return self.get_results()
+
+    def get_results(self):
+        """
+        Get the results of the fitted mixture model
+        """
+        if self.last is None:
+            self.last = self.n_iterations
+
+        if self._run:
+            pis = array([self.hdp.weights[-self.last:, k, :].flatten() for k in
+                         range(self.n_data_sets)])
+            mus = (
+                self.hdp.mu[-self.last:].reshape(
+                    self.n_clusters * self.last,
+                    self.d
+                ) * self.s + self.m
+            )
+            sigmas = (
+                self.hdp.Sigma[-self.last:].reshape(
+                    self.n_clusters * self.last,
+                    self.d
+                ) * outer(self.s, self.s)
+            )
+            return HDPMixture(
+                pis,
+                mus,
+                sigmas,
+                self.last,
+                self.m,
+                self.s,
+                self.identity
+            )
