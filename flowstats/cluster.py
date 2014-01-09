@@ -4,9 +4,10 @@ Created on Oct 30, 2009
 @author: jolly
 """
 
-from numpy import zeros, outer, sum, eye, array, mean, cov, vstack, std, ones
-from numpy.random import multivariate_normal as mvn
-from numpy.random import seed
+import numpy as np
+from numpy.random import multivariate_normal
+from numpy.random import seed as np_seed
+from datetime import datetime
 
 from dpmix import DPNormalMixture, BEM_DPNormalMixture, HDPNormalMixture
 
@@ -21,10 +22,10 @@ class DPMixtureModel(object):
     def __init__(
             self,
             n_clusters,
-            n_iterations=1000,
-            burn_in=100,
-            last=None,
-            model='mcmc'):
+            n_iterations,
+            burn_in,
+            model,
+            last=None):
         """
         n_clusters = number of clusters to fit
         n_iterations = number of MCMC iterations to sample
@@ -40,7 +41,6 @@ class DPMixtureModel(object):
 
         self.data = None
         self.cdp = None
-        self._run = None
 
         self.gamma_0 = 10
         self.m_0 = None
@@ -54,6 +54,8 @@ class DPMixtureModel(object):
 
         self.e0 = 5
         self.f0 = 0.1
+
+        self.parallel = False
 
         self._prior_mu = None
         self._prior_pi = None
@@ -70,13 +72,6 @@ class DPMixtureModel(object):
         self.s = None
         self.d = None
         self.n = None
-
-        self.seed = None
-
-        self.device = None
-
-        self.identity = False
-        self.parallel = False
 
     def load_mu(self, mu):
         if len(mu.shape) > 2:
@@ -100,10 +95,12 @@ class DPMixtureModel(object):
             raise ValueError('Dimension mismatch between Mus and Data')
 
         elif n < self.n_clusters:
-            self._prior_mu = zeros((self.n_clusters, self.d))
+            self._prior_mu = np.zeros((self.n_clusters, self.d))
             self._prior_mu[0:n, :] = (self.prior_mu.copy() - self.m) / self.s
-            self._prior_mu[n:, :] = mvn(zeros((self.d,)), eye(self.d),
-                                        self.n_clusters - n)
+            self._prior_mu[n:, :] = multivariate_normal(
+                np.zeros((self.d,)),
+                np.eye(self.d),
+                self.n_clusters - n)
         else:
             self._prior_mu = (self.prior_mu.copy() - self.m) / self.s
 
@@ -113,7 +110,7 @@ class DPMixtureModel(object):
             raise ValueError('Shape of Sigma is wrong')
 
         if len(sigma.shape) == 2:
-            sigma = array(sigma)
+            sigma = np.array(sigma)
 
         if sigma.shape[1] != sigma.shape[2]:
             raise ValueError("Sigmas must be square matrices")
@@ -132,17 +129,18 @@ class DPMixtureModel(object):
             raise ValueError('Dimension mismatch between Sigmas and Data')
 
         elif n < self.n_clusters:
-            self._prior_sigma = zeros((self.n_clusters, self.d, self.d))
-            self._prior_sigma[0:n, :, :] = (self.prior_sigma.copy()) / outer(
+            self._prior_sigma = np.zeros((self.n_clusters, self.d, self.d))
+            self._prior_sigma[0:n, :, :] = (self.prior_sigma.copy()) / np.outer(
                 self.s, self.s)
             for i in range(n, self.n_clusters):
-                self._prior_sigma[i, :, :] = eye(self.d)
+                self._prior_sigma[i, :, :] = np.eye(self.d)
         else:
-            self._prior_sigma = (self.prior_sigma.copy()) / outer(self.s,
-                                                                  self.s)
+            self._prior_sigma = (self.prior_sigma.copy()) / np.outer(
+                self.s,
+                self.s)
 
     def load_pi(self, pi):
-        tmp = array(pi)
+        tmp = np.array(pi)
         if len(tmp.shape) != 1:
             raise ValueError("Shape of pi is wrong")
         n = tmp.shape[0]
@@ -150,12 +148,12 @@ class DPMixtureModel(object):
             raise ValueError(
                 'Number of proposed Pis greater then number of clusters')
 
-        if sum(tmp) > 1:
+        if np.sum(tmp) > 1:
             raise ValueError('Proposed Pis sum to more than 1')
         if n < self.n_clusters:
-            self._prior_pi = zeros(self.n_clusters)
+            self._prior_pi = np.zeros(self.n_clusters)
             self._prior_pi[0:n] = tmp
-            left = (1.0 - sum(tmp)) / (self.n_clusters - n)
+            left = (1.0 - np.sum(tmp)) / (self.n_clusters - n)
             for i in range(n, self.n_clusters):
                 self._prior_pi[i] = left
         else:
@@ -172,33 +170,63 @@ class DPMixtureModel(object):
             self.prior_sigma = self._ref.sigmas
             self.prior_pi = self._ref.pis
         else:
-            self.prior_mu = zeros((self.n_clusters, points.shape[1]))
-            self.prior_sigma = zeros(
+            self.prior_mu = np.zeros((self.n_clusters, points.shape[1]))
+            self.prior_sigma = np.zeros(
                 (self.n_clusters, points.shape[1], points.shape[1]))
             for i in range(self.n_clusters):
                 try:
-                    self.prior_mu[i] = mean(points[self._ref == i], 0)
-                    self.prior_sigma[i] = cov(points[self._ref == i], rowvar=0)
+                    self.prior_mu[i] = np.mean(points[self._ref == i], 0)
+                    self.prior_sigma[i] = np.cov(
+                        points[self._ref == i],
+                        rowvar=0)
                 except Exception, e:
                     print e
-                    self.prior_mu[i] = zeros(points.shape[1])
-                    self.prior_sigma[i] = eye(points.shape[1])
+                    self.prior_mu[i] = np.zeros(points.shape[1])
+                    self.prior_sigma[i] = np.eye(points.shape[1])
 
             tot = float(points.shape[0])
-            self.prior_pi = array(
+            self.prior_pi = np.array(
                 [
                     points[self._ref == i].shape[0] / tot for i in
                     range(self.n_clusters)
                 ]
             )
 
-    def fit(self, data, verbose=False, normed=False):
+    def fit(
+            self,
+            data,
+            device,
+            seed=None,
+            verbose=False,
+            normed=False,
+            munkres_id=False):
         if isinstance(data, list) or isinstance(data, tuple):
-            return [self._fit(i, verbose, normed) for i in data]
+            return [
+                self._fit(
+                    i,
+                    device,
+                    seed=seed,
+                    verbose=verbose,
+                    normed=normed,
+                    munkres_id=munkres_id) for i in data
+            ]
         else:
-            return self._fit(data, verbose, normed)
+            return self._fit(
+                data,
+                device,
+                seed=seed,
+                verbose=verbose,
+                normed=normed,
+                munkres_id=munkres_id)
 
-    def _fit(self, data, verbose=False, normed=False):
+    def _fit(
+            self,
+            data,
+            device,
+            seed=None,
+            verbose=False,
+            normed=False,
+            munkres_id=False):
         """
         Fit the mixture model to the data
         use get_results() to get the fitted model
@@ -206,8 +234,8 @@ class DPMixtureModel(object):
         points = data.copy().astype('double')
         if normed:
             self.data = points
-            self.m = zeros(self.data.shape[1])
-            self.s = ones(self.data.shape[1])
+            self.m = np.zeros(self.data.shape[1])
+            self.s = np.ones(self.data.shape[1])
         else:
             self.m = points.mean(0)
             self.s = points.std(0)
@@ -223,7 +251,7 @@ class DPMixtureModel(object):
         self.n, self.d = self.data.shape
 
         if self._ref is not None:
-            self.identity = True
+            munkres_id = True
             self._load_ref_at_fit(points)
 
         if self.prior_mu is not None:
@@ -231,12 +259,10 @@ class DPMixtureModel(object):
         if self.prior_sigma is not None:
             self._load_sigma_at_fit()
 
-        if self.seed is not None:
-            seed(self.seed)
+        if seed:
+            np_seed(seed)
         else:
-            from datetime import datetime
-
-            seed(datetime.now().microsecond)
+            np_seed(datetime.now().microsecond)
 
         #TODO move hyperparameter settings here
         if self.model.lower() == 'bem':
@@ -253,7 +279,7 @@ class DPMixtureModel(object):
                 Sigma0=self._prior_sigma,
                 weights0=self._prior_pi,
                 alpha0=self.alpha_0,
-                gpu=self.device,
+                gpu=device,
                 parallel=self.parallel,
                 verbose=verbose)
             self.cdp.optimize(self.n_iterations)
@@ -271,70 +297,50 @@ class DPMixtureModel(object):
                 Sigma0=self._prior_sigma,
                 weights0=self._prior_pi,
                 alpha0=self.alpha_0,
-                gpu=self.device,
+                gpu=device,
                 parallel=self.parallel,
                 verbose=verbose)
             self.cdp.sample(
                 niter=self.n_iterations,
                 nburn=self.burn_in,
                 thin=1,
-                ident=self.identity)
+                ident=munkres_id)
 
         if self.last is None:
             self.last = self.n_iterations
 
-        self._run = True  # we've fit the mixture model
-
-        return self.get_results()
-
-    def get_results(self):
-        """
-        get the results of the fitted mixture model
-        """
-        if self._run:
-            if self.model.lower() == 'bem':
-                results = []
+        if self.model.lower() == 'bem':
+            results = []
+            for j in range(self.n_clusters):
+                tmp = DPCluster(
+                    self.cdp.weights[j],
+                    (self.cdp.mu[j] * self.s) + self.m,
+                    self.cdp.Sigma[j] * np.outer(self.s, self.s),
+                    self.cdp.mu[j],
+                    self.cdp.Sigma[j]
+                )
+                results.append(tmp)
+            tmp = DPMixture(results, self.m, self.s)
+        else:
+            results = []
+            for i in range(self.last):
                 for j in range(self.n_clusters):
                     tmp = DPCluster(
-                        self.cdp.weights[j],
-                        (self.cdp.mu[j] * self.s) + self.m,
-                        self.cdp.Sigma[j] * outer(self.s, self.s),
-                        self.cdp.mu[j],
-                        self.cdp.Sigma[j]
+                        self.cdp.weights[-(i + 1), j],
+                        (self.cdp.mu[-(i + 1), j] * self.s) + self.m,
+                        self.cdp.Sigma[-(i + 1), j] * np.outer(
+                            self.s, self.s),
+                        self.cdp.mu[-(i + 1), j],
+                        self.cdp.Sigma[-(i + 1), j]
                     )
                     results.append(tmp)
-                tmp = DPMixture(results, self.m, self.s)
-            else:
-                results = []
-                for i in range(self.last):
-                    for j in range(self.n_clusters):
-                        tmp = DPCluster(
-                            self.cdp.weights[-(i + 1), j],
-                            (self.cdp.mu[-(i + 1), j] * self.s) + self.m,
-                            self.cdp.Sigma[-(i + 1), j] * outer(self.s, self.s),
-                            self.cdp.mu[-(i + 1), j],
-                            self.cdp.Sigma[-(i + 1), j]
-                        )
-                        results.append(tmp)
-                tmp = DPMixture(
-                    results,
-                    self.last,
-                    self.m,
-                    self.s,
-                    self.identity)
-            return tmp
-        else:
-            return None  # TODO raise exception
-
-    def get_class(self):
-        """
-        Get the last classification from the model
-        """
-
-        if self._run:
-            return self.cdp.getK(self.n)
-        else:
-            return None  # TODO raise exception
+            tmp = DPMixture(
+                results,
+                self.last,
+                self.m,
+                self.s,
+                munkres_id)
+        return tmp
 
 
 class HDPMixtureModel(DPMixtureModel):
@@ -346,22 +352,38 @@ class HDPMixtureModel(DPMixtureModel):
            (if None, last = n_iterations)
     """
 
-    def __init__(self, *args, **kwargs):
-        super(HDPMixtureModel, self).__init__(*args, **kwargs)
+    def __init__(self, n_clusters, n_iterations, burn_in):
+        super(HDPMixtureModel, self).__init__(
+            n_clusters,
+            n_iterations,
+            burn_in,
+            model='hdp',
+            last=None
+        )
+
+        self.e0 = 1.0
+        self.f0 = 1.0
         self.g0 = 0.1
         self.h0 = 0.1
 
         self.n_data_sets = None
         self.hdp = None
 
-    def fit(self, data_sets, verbose=False, tune_interval=100):
+    def fit(
+            self,
+            data_sets,
+            device,
+            seed=None,
+            verbose=False,
+            munkres_id=False,
+            tune_interval=100):
         self.d = data_sets[0].shape[1]
 
         data_sets = [i.copy().astype('double') for i in data_sets]
         self.n_data_sets = len(data_sets)
-        total_data = vstack(data_sets)
-        self.m = mean(total_data, 0)
-        self.s = std(total_data, 0)
+        total_data = np.vstack(data_sets)
+        self.m = np.mean(total_data, 0)
+        self.s = np.std(total_data, 0)
         standardized = []
         for i in data_sets:
             if i.shape[1] != self.d:
@@ -373,11 +395,10 @@ class HDPMixtureModel(DPMixtureModel):
         if self.prior_sigma is not None:
             self._load_sigma_at_fit()
 
-        if self.seed is not None:
-            seed(self.seed)
+        if seed is not None:
+            np_seed(seed)
         else:
-            from datetime import datetime
-            seed(datetime.now().microsecond)
+            np_seed(datetime.now().microsecond)
 
         self.hdp = HDPNormalMixture(
             standardized,
@@ -394,48 +415,41 @@ class HDPMixtureModel(DPMixtureModel):
             Sigma0=self._prior_sigma,
             weights0=self._prior_pi,
             alpha0=self.alpha_0,
-            gpu=self.device,
+            gpu=device,
             parallel=self.parallel,
             verbose=verbose)
         self.hdp.sample(
             niter=self.n_iterations,
             nburn=self.burn_in,
             thin=1,
-            ident=self.identity,
+            ident=munkres_id,
             tune_interval=tune_interval)
 
-        self._run = True  # we've fit the mixture model
 
-        return self.get_results()
-
-    def get_results(self):
-        """
-        Get the results of the fitted mixture model
-        """
-        if self.last is None:
-            self.last = self.n_iterations
-
-        if self._run:
-            pis = array([self.hdp.weights[-self.last:, k, :].flatten() for k in
-                         range(self.n_data_sets)])
-            mus = (
-                self.hdp.mu[-self.last:].reshape(
-                    self.n_clusters * self.last,
-                    self.d
-                ) * self.s + self.m
-            )
-            sigmas = (
-                self.hdp.Sigma[-self.last:].reshape(
-                    self.n_clusters * self.last,
-                    self.d
-                ) * outer(self.s, self.s)
-            )
-            return HDPMixture(
-                pis,
-                mus,
-                sigmas,
-                self.last,
-                self.m,
-                self.s,
-                self.identity
-            )
+        pis = np.array(
+            [
+                self.hdp.weights[-self.last:, k, :].flatten()
+                for k in range(self.n_data_sets)
+            ]
+        )
+        mus = (
+            self.hdp.mu[-self.last:].reshape(
+                self.n_clusters * self.last,
+                self.d
+            ) * self.s + self.m
+        )
+        sigmas = (
+            self.hdp.Sigma[-self.last:].reshape(
+                self.n_clusters * self.last,
+                self.d
+            ) * np.outer(self.s, self.s)
+        )
+        return HDPMixture(
+            pis,
+            mus,
+            sigmas,
+            self.last,
+            self.m,
+            self.s,
+            munkres_id
+        )
