@@ -105,10 +105,10 @@ class DPCluster(object):
 
         if isinstance(k, Number):
             new_mu = self.mu * k
-            new_sigma = k * k * self.sigma
+            new_sigma = self.sigma * k * k
         elif isinstance(k, np.ndarray):
             new_mu = np.dot(self.mu, k)
-            new_sigma = np.dot(np.dot(k.T, self.sigma), k)
+            new_sigma = np.dot(np.dot(k.transpose(), self.sigma), k)
         else:
             raise TypeError('unsupported type: %s' % type(k))
 
@@ -117,10 +117,10 @@ class DPCluster(object):
     def __rmul__(self, k):
         if isinstance(k, Number):
             new_mu = self.mu * k
-            new_sigma = k * k * self.sigma
+            new_sigma = self.sigma * k * k
         elif isinstance(k, np.ndarray):
             new_mu = np.dot(k, self.mu)
-            new_sigma = np.dot(np.dot(k, self.sigma), k.T)
+            new_sigma = np.dot(np.dot(k, self.sigma), k.transpose())
         else:
             raise TypeError('unsupported type: %s' % type(k))
 
@@ -618,7 +618,7 @@ class ModalDPMixture(DPMixture):
         new_modes = {}
         for i in self.modemap:
             if isinstance(a, Number):
-                new_modes[i] = a * self.modemap[i]
+                new_modes[i] = self.modemap[i] * a
             else:
                 new_modes[i] = np.dot(a, self.modemap[i])
         return ModalDPMixture(new_clusters, self.cmap, new_modes, self.niter,
@@ -858,11 +858,11 @@ class HDPMixture(object):
 
         if isinstance(k, Number):
             new_mu = self.mus * k
-            new_sigma = k * k * self.sigmas
+            new_sigma = self.sigmas * k * k
         elif isinstance(k, np.ndarray):
             new_mu = np.dot(self.mus, k)
             new_sigma = np.array(
-                [np.dot(np.dot(k, i), k.T) for i in self.sigmas])
+                [np.dot(np.dot(k, i), k.transpose()) for i in self.sigmas])
         else:
             raise TypeError('unsupported type: %s' % type(k))
 
@@ -878,11 +878,11 @@ class HDPMixture(object):
     def __rmul__(self, k):
         if isinstance(k, Number):
             new_mu = self.mus * k
-            new_sigma = k * k * self.sigmas
+            new_sigma = self.sigmas * k * k
         elif isinstance(k, np.ndarray):
             new_mu = np.dot(k, self.mus)
             new_sigma = np.array(
-                [np.dot(k, np.dot(i, k.T)) for i in self.sigmas])
+                [np.dot(k, np.dot(i, k.transpose())) for i in self.sigmas])
         else:
             raise TypeError('unsupported type: %s' % type(k))
 
@@ -1060,11 +1060,11 @@ class ModalHDPMixture(HDPMixture):
     def __mul__(self, k):
         if isinstance(k, Number):
             new_mu = self.mus * k
-            new_sigma = k * k * self.sigmas
+            new_sigma = self.sigmas * k * k
         elif isinstance(k, np.ndarray):
             new_mu = np.dot(self.mus, k)
             new_sigma = np.array(
-                [np.dot(np.dot(k, i), k.T) for i in self.sigmas])
+                [np.dot(np.dot(k, i), k.transpose()) for i in self.sigmas])
         else:
             raise TypeError('unsupported type: %s' % type(k))
 
@@ -1074,11 +1074,11 @@ class ModalHDPMixture(HDPMixture):
     def __rmul__(self, k):
         if isinstance(k, Number):
             new_mu = self.mus * k
-            new_sigma = k * k * self.sigmas
+            new_sigma = self.sigmas * k * k
         elif isinstance(k, np.ndarray):
             new_mu = np.dot(k, self.mus)
             new_sigma = np.array(
-                [np.dot(np.dot(k, i), k.T) for i in self.sigmas])
+                [np.dot(np.dot(k, i), k.transpose()) for i in self.sigmas])
         else:
             raise TypeError('unsupported type: %s' % type(k))
 

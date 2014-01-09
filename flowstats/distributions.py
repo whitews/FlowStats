@@ -2,7 +2,7 @@
 Distributions used in FCS analysis
 """
 
-from numpy import array, sum, cumsum, reshape, exp, ones, ndarray
+import numpy as np
 from numpy.random import random, multivariate_normal
 from scipy.misc import logsumexp
 
@@ -36,14 +36,14 @@ def _mvnpdf(x, mu, va, logged=False, use_gpu=True, **kwargs):
             x,
             mu,
             va,
-            weights=ones(mu.shape[0]),
+            weights=np.ones(mu.shape[0]),
             logged=logged,
             order='C').astype('float64')
     else:
         if logged:
-            return mvn_weighted_logged(x, mu, va, ones(mu.shape[0]))
+            return mvn_weighted_logged(x, mu, va, np.ones(mu.shape[0]))
         else:
-            return exp(mvn_weighted_logged(x, mu, va, ones(mu.shape[0])))
+            return np.exp(mvn_weighted_logged(x, mu, va, np.ones(mu.shape[0])))
 
 
 def _wmvnpdf(x, pi, mu, va, logged=False, use_gpu=True, **kwargs):
@@ -58,8 +58,8 @@ def _wmvnpdf(x, pi, mu, va, logged=False, use_gpu=True, **kwargs):
         va = va.reshape(va.shape[0], 1, 1)
 
     if isinstance(pi, float) or isinstance(pi, int):
-        pi = array([pi])
-    elif isinstance(pi, ndarray):
+        pi = np.array([pi])
+    elif isinstance(pi, np.ndarray):
         if len(pi.shape) == 0:
             pi = pi.reshape(1)
 
@@ -80,7 +80,7 @@ def _wmvnpdf(x, pi, mu, va, logged=False, use_gpu=True, **kwargs):
         if logged:
             return mvn_weighted_logged(x, mu, va, pi)
         else:
-            return exp(mvn_weighted_logged(x, mu, va, pi))
+            return np.exp(mvn_weighted_logged(x, mu, va, pi))
 
 
 def mvnormpdf(x, mu, va, **kwargs):
@@ -122,8 +122,7 @@ def compmixnormpdf(x, prop, mu, sigma, **kwargs):
             tmp = tmp[0]
     else:
         tmp = _wmvnpdf(x, prop, mu, sigma, **kwargs)
-        tmp = reshape(tmp, (n, c))
-        #tmp = sum(tmp,1)
+        tmp = np.reshape(tmp, (n, c))
         if n == 1:
             tmp = tmp[0]
     return tmp
@@ -140,18 +139,18 @@ def mixnormpdf(x, prop, mu, sigma, **kwargs):
         if logged:
             return logsumexp(tmp, 1)
         else:
-            return sum(tmp, 1)
+            return np.sum(tmp, 1)
     except ValueError:
         if logged:
             return logsumexp(tmp, 0)
         else:
-            return sum(tmp, 0)
+            return np.sum(tmp, 0)
 
 
 def mixnormrnd(pi, mu, sigma, k):
     """Generate random variables from mixture of Guassians"""
     xs = []
     for unused in range(k):
-        j = sum(random() > cumsum(pi))
+        j = np.sum(random() > np.cumsum(pi))
         xs.append(multivariate_normal(mu[j], sigma[j]))
-    return array(xs)
+    return np.array(xs)
