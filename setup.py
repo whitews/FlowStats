@@ -6,5 +6,5 @@ setup(
     packages=['flowstats'],
     package_data={'': []},
     description='Flow Cytometry Standard Statistical Functions',
-    requires=['numpy', 'scipy', 'dpmix'],
+    requires=['numpy', 'scipy', 'dpmix', 'matplotlib'],
 )
