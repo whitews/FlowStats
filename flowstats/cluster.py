@@ -425,22 +425,22 @@ class HDPMixtureModel(DPMixtureModel):
             ident=munkres_id,
             tune_interval=tune_interval)
 
-
         pis = np.array(
             [
-                self.hdp.weights[-self.last:, k, :].flatten()
+                self.hdp.weights[-self.n_iterations:, k, :].flatten()
                 for k in range(self.n_data_sets)
             ]
         )
         mus = (
-            self.hdp.mu[-self.last:].reshape(
-                self.n_clusters * self.last,
+            self.hdp.mu[-self.n_iterations:].reshape(
+                self.n_clusters * self.n_iterations,
                 self.d
             ) * self.s + self.m
         )
         sigmas = (
-            self.hdp.Sigma[-self.last:].reshape(
-                self.n_clusters * self.last,
+            self.hdp.Sigma[-self.n_iterations:].reshape(
+                self.n_clusters * self.n_iterations,
+                self.d,
                 self.d
             ) * np.outer(self.s, self.s)
         )
@@ -448,7 +448,7 @@ class HDPMixtureModel(DPMixtureModel):
             pis,
             mus,
             sigmas,
-            self.last,
+            self.n_iterations,
             self.m,
             self.s,
             munkres_id
