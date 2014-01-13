@@ -1,7 +1,9 @@
 import unittest
 import numpy as np
 from matplotlib import pyplot, gridspec
+from matplotlib.patches import Ellipse
 from flowstats import cluster
+import datetime
 
 
 class HDPMixtureModelTestCase(unittest.TestCase):
@@ -22,31 +24,75 @@ class HDPMixtureModelTestCase(unittest.TestCase):
 
         return data_sets
 
+    @staticmethod
+    def calculate_ellipse(center_x, center_y, covariance_matrix, n_std_dev=3):
+        values, vectors = np.linalg.eigh(covariance_matrix)
+        # order = values.argsort()[::-1]
+        # values = values[order]
+        # vectors = vectors[:, order]
+
+        theta = np.degrees(np.arctan2(*vectors[:, 0][::-1]))
+
+        # Width and height are "full" widths, not radius
+        width, height = 2 * n_std_dev * np.sqrt(values)
+
+        ellipse = Ellipse(
+            xy=[center_x, center_y],
+            width=width,
+            height=height,
+            angle=theta
+        )
+
+        return ellipse
+
     def test_hdp(self):
-        n_data_sets = 5
-        n_clusters = 16
-        n_iterations = 2
-        burn_in = 100
+        n_data_sets = 10
+        n_clusters = 4
+        n_iterations = 50
+        burn_in = 50
 
         data_sets = self.generate_data(n_data_sets)
-        figure = pyplot.figure(figsize=(6, 12))
-        gs = gridspec.GridSpec(n_data_sets, 1, width_ratios=(2,3))
-
-        for i, d in enumerate(data_sets):
-            pyplot.subplot(gs[i])
-            pyplot.axis([-15, 15, -15, 15])
-            pyplot.plot(
-                d[:, 0],
-                d[:, 1],
-                ls="*",
-                marker='.'
-            )
 
         model = cluster.HDPMixtureModel(n_clusters, n_iterations, burn_in)
 
-        # results = model.fit(data_sets, None, seed=123, munkres_id=True)
-        # results_averaged = results.average()
-        # results_modal = results_averaged.make_modal()
+        time_0 = datetime.datetime.now()
+        results = model.fit(data_sets, True, seed=123, munkres_id=True, verbose=True)
+        time_1 = datetime.datetime.now()
+
+        delta_time = time_1 - time_0
+        print delta_time.total_seconds()
+
+        results_averaged = results.average()
+        results_modal = results_averaged.make_modal()
+
+        # there should be n_clusters of rows in both mus and sigmas
+        mus_averaged = results_averaged.mus
+        sigmas_averaged = results_averaged.sigmas
+        self.assertEqual(mus_averaged.shape[0], sigmas_averaged.shape[0])
+
+        # calculate our ellipses from the averaged results
+        ellipses = list()
+        for i, mu in enumerate(mus_averaged):
+            ellipse = self.calculate_ellipse(mu[0], mu[1], sigmas_averaged[i])
+            ellipse.set_alpha(0.3)
+            ellipse.set_facecolor((1, 0, 0))
+            ellipse.set_edgecolor((0, 0, 0))
+            ellipses.append(ellipse)
+
+        figure = pyplot.figure(figsize=(6, 6))
+
+        ax = figure.gca()
+        pyplot.axis([-15, 15, -15, 15])
+        pyplot.plot(
+            data_sets[0][:, 0],
+            data_sets[0][:, 1],
+            ls="*",
+            marker='.',
+            alpha=0.1
+        )
+        for j, e in enumerate(ellipses):
+            if results.pis[0][j] > 0.01:
+                ax.add_artist(e)
 
         pyplot.tight_layout()
         pyplot.show()
