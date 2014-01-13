@@ -418,6 +418,8 @@ class HDPMixtureModel(DPMixtureModel):
             gpu=device,
             parallel=self.parallel,
             verbose=verbose)
+        if not device:
+            self.hdp.gpu = False
         self.hdp.sample(
             niter=self.n_iterations,
             nburn=self.burn_in,
