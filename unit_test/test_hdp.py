@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from matplotlib import pyplot, gridspec
+from matplotlib import pyplot
 from matplotlib.patches import Ellipse
 from flowstats import cluster
 import datetime
@@ -43,59 +43,97 @@ class HDPMixtureModelTestCase(unittest.TestCase):
             angle=theta
         )
 
+        ellipse.set_alpha(0.3)
+        ellipse.set_facecolor((1, 0, 0))
+
         return ellipse
 
     def test_hdp(self):
-        n_data_sets = 10
-        n_clusters = 4
-        n_iterations = 50
-        burn_in = 50
+        n_data_sets = 2
+        n_clusters = 16
+        n_iterations = 3
+        burn_in = 10
 
         data_sets = self.generate_data(n_data_sets)
 
         model = cluster.HDPMixtureModel(n_clusters, n_iterations, burn_in)
 
         time_0 = datetime.datetime.now()
-        results = model.fit(data_sets, True, seed=123, munkres_id=True, verbose=True)
+
+        results = model.fit(
+            data_sets,
+            True,
+            seed=123,
+            munkres_id=True,
+            verbose=True
+        )
+
         time_1 = datetime.datetime.now()
 
         delta_time = time_1 - time_0
         print delta_time.total_seconds()
 
-        results_averaged = results.average()
-        results_modal = results_averaged.make_modal()
+        # pis are split by data set, then iteration
+        pis = np.array_split(results.pis, n_data_sets)
+        for i, p in enumerate(pis):
+            pis[i] = np.array_split(pis[i][0], n_iterations)
 
-        # there should be n_clusters of rows in both mus and sigmas
+        # mus and sigmas are split by iteration
+        mus = np.array_split(results.mus, n_iterations)
+        sigmas = np.array_split(results.sigmas, n_iterations)
+
+        # generate an ellipse set for each iteration
+        # this will be a list of lists (iteration of clusters)
+        ellipses = list()
+        for i in range(n_iterations):
+            ellipses.append(list())
+            for j in range(n_clusters):
+                ellipse = self.calculate_ellipse(
+                    mus[i][j][0],
+                    mus[i][j][1],
+                    sigmas[i][j])
+                ellipses[i].append(ellipse)
+
+        # plot each iteration for each data set
+        for i in range(n_data_sets):
+            print "set: %d" % i
+
+            for j in range(n_iterations):
+                figure = pyplot.figure()
+                ax = figure.gca()
+
+                pyplot.plot(
+                    data_sets[i][:, 0],
+                    data_sets[i][:, 1],
+                    ls="*",
+                    marker=".",
+                    alpha=0.1
+                )
+
+                print "\titeration: %d" % j
+
+                for k in range(n_clusters):
+                    if pis[i][j][k] > 0.01:
+                        ax.add_artist(ellipses[j][k])
+                        print "\t\tclust: %d, xy: %s, angle: %f, weight: %f" % (
+                            k,
+                            ellipse.center,
+                            ellipse.angle,
+                            pis[i][j][k]
+                        )
+
+                pyplot.axis([-15, 15, -15, 15])
+
+        pyplot.show()
+
+        # TODO: test that these are averaged correctly
+        results_averaged = results.average()
         mus_averaged = results_averaged.mus
         sigmas_averaged = results_averaged.sigmas
+
+        # there should be n_clusters of rows in both mus and sigmas
         self.assertEqual(mus_averaged.shape[0], sigmas_averaged.shape[0])
 
-        # calculate our ellipses from the averaged results
-        ellipses = list()
-        for i, mu in enumerate(mus_averaged):
-            ellipse = self.calculate_ellipse(mu[0], mu[1], sigmas_averaged[i])
-            ellipse.set_alpha(0.3)
-            ellipse.set_facecolor((1, 0, 0))
-            ellipse.set_edgecolor((0, 0, 0))
-            ellipses.append(ellipse)
-
-        figure = pyplot.figure(figsize=(6, 6))
-
-        ax = figure.gca()
-        pyplot.axis([-15, 15, -15, 15])
-        pyplot.plot(
-            data_sets[0][:, 0],
-            data_sets[0][:, 1],
-            ls="*",
-            marker='.',
-            alpha=0.1
-        )
-        for j, e in enumerate(ellipses):
-            if results.pis[0][j] > 0.01:
-                ax.add_artist(e)
-
-        pyplot.tight_layout()
-        pyplot.show()
 
 
 if __name__ == '__main__':
