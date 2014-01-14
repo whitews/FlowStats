@@ -54,6 +54,9 @@ class HDPMixtureModelTestCase(unittest.TestCase):
         n_iterations = 3
         burn_in = 10
 
+        figure_size = (5, 5)
+        pis_threshold = 0.05
+
         data_sets = self.generate_data(n_data_sets)
 
         model = cluster.HDPMixtureModel(n_clusters, n_iterations, burn_in)
@@ -94,13 +97,30 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                     sigmas[i][j])
                 ellipses[i].append(ellipse)
 
-        # plot each iteration for each data set
+        # Get averaged results
+        results_averaged = results.average()
+        pis_averaged = np.array_split(results_averaged.pis, n_data_sets)
+        mus_averaged = results_averaged.mus
+        sigmas_averaged = results_averaged.sigmas
+
+        # generate averaged ellipses (indexed by clusters only, no iterations)
+        ellipses_avg = list()
+        for j in range(n_clusters):
+            ellipse = self.calculate_ellipse(
+                mus_averaged[j][0],
+                mus_averaged[j][1],
+                sigmas_averaged[j]
+            )
+            ellipses_avg.append(ellipse)
+
+        # plot each iteration and the averaged result for each data set
         for i in range(n_data_sets):
             print "set: %d" % i
 
             for j in range(n_iterations):
-                figure = pyplot.figure()
+                figure = pyplot.figure(figsize=figure_size)
                 ax = figure.gca()
+                pyplot.axis([-15, 15, -15, 15])
 
                 pyplot.plot(
                     data_sets[i][:, 0],
@@ -113,23 +133,43 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                 print "\titeration: %d" % j
 
                 for k in range(n_clusters):
-                    if pis[i][j][k] > 0.01:
+                    if pis[i][j][k] > pis_threshold:
                         ax.add_artist(ellipses[j][k])
-                        print "\t\tclust: %d, xy: %s, angle: %f, weight: %f" % (
+                        print "\t\tclust: %02d, xy: (%.2f, %.2f), " \
+                            "angle: %.2f, weight: %.3f" % (
+                                k,
+                                ellipses[j][k].center[0],
+                                ellipses[j][k].center[1],
+                                ellipses[j][k].angle,
+                                pis[i][j][k]
+                            )
+
+            # now show the averaged results on this data set
+            print "\taveraged:"
+            figure = pyplot.figure(figsize=figure_size)
+            ax = figure.gca()
+            pyplot.axis([-15, 15, -15, 15])
+
+            pyplot.plot(
+                data_sets[i][:, 0],
+                data_sets[i][:, 1],
+                ls="*",
+                marker=".",
+                alpha=0.1
+            )
+            for k in range(n_clusters):
+                if pis_averaged[i][0][k] > pis_threshold:
+                    ax.add_artist(ellipses_avg[k])
+                    print "\t\tclust: %02d, xy: (%.2f, %.2f), " \
+                        "angle: %.2f, weight: %.3f" % (
                             k,
-                            ellipses[j][k].center,
-                            ellipses[j][k].angle,
-                            pis[i][j][k]
+                            ellipses_avg[k].center[0],
+                            ellipses_avg[k].center[1],
+                            ellipses_avg[k].angle,
+                            pis_averaged[i][0][k]
                         )
 
-                pyplot.axis([-15, 15, -15, 15])
-
         pyplot.show()
-
-        # TODO: test that these are averaged correctly
-        results_averaged = results.average()
-        mus_averaged = results_averaged.mus
-        sigmas_averaged = results_averaged.sigmas
 
         # there should be n_clusters of rows in both mus and sigmas
         self.assertEqual(mus_averaged.shape[0], sigmas_averaged.shape[0])
