@@ -117,8 +117,8 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                         ax.add_artist(ellipses[j][k])
                         print "\t\tclust: %d, xy: %s, angle: %f, weight: %f" % (
                             k,
-                            ellipse.center,
-                            ellipse.angle,
+                            ellipses[j][k].center,
+                            ellipses[j][k].angle,
                             pis[i][j][k]
                         )
 
@@ -133,7 +133,6 @@ class HDPMixtureModelTestCase(unittest.TestCase):
 
         # there should be n_clusters of rows in both mus and sigmas
         self.assertEqual(mus_averaged.shape[0], sigmas_averaged.shape[0])
-
 
 
 if __name__ == '__main__':
