@@ -27,9 +27,9 @@ class HDPMixtureModelTestCase(unittest.TestCase):
     @staticmethod
     def calculate_ellipse(center_x, center_y, covariance_matrix, n_std_dev=3):
         values, vectors = np.linalg.eigh(covariance_matrix)
-        # order = values.argsort()[::-1]
-        # values = values[order]
-        # vectors = vectors[:, order]
+        order = values.argsort()[::-1]
+        values = values[order]
+        vectors = vectors[:, order]
 
         theta = np.degrees(np.arctan2(*vectors[:, 0][::-1]))
 
@@ -53,10 +53,10 @@ class HDPMixtureModelTestCase(unittest.TestCase):
         return ellipse
 
     def test_hdp(self):
-        n_data_sets = 2
+        n_data_sets = 3
         n_clusters = 16
-        n_iterations = 3
-        burn_in = 10
+        n_iterations = 4
+        burn_in = 100
 
         figure_size = (16, 12)
         pis_threshold = 0.05
