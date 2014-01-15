@@ -53,15 +53,16 @@ class HDPMixtureModelTestCase(unittest.TestCase):
         return ellipse
 
     def test_hdp(self):
-        n_data_sets = 3
-        n_clusters = 16
-        n_iterations = 4
-        burn_in = 100
+        n_points = 1000
+        n_data_sets = 2
+        n_clusters = 4
+        n_iterations = 2
+        burn_in = 400
 
         figure_size = (16, 12)
         pis_threshold = 0.05
 
-        data_sets = self.generate_data(n_data_sets)
+        data_sets = self.generate_data(n_data_sets, n_data_points=n_points)
 
         model = cluster.HDPMixtureModel(n_clusters, n_iterations, burn_in)
 
@@ -97,11 +98,20 @@ class HDPMixtureModelTestCase(unittest.TestCase):
 
         # plot each iteration and the averaged result for each data set
         fig = pyplot.figure(figsize=figure_size)
+        fig.suptitle(
+            "Points: %d, Data sets: %d, Clusters: %d, Iterations: %d, Burn-in: %d" % (
+                n_points,
+                n_data_sets,
+                n_clusters,
+                n_iterations,
+                burn_in
+            )
+        )
         n_rows = n_data_sets
         n_columns = n_iterations + 1
         i_plot = 1  # plot iterator
         for i in range(n_data_sets):
-            print "set: %d" % i
+            output = "set: %d\n" % i
 
             for j in range(n_iterations):
 
@@ -113,16 +123,16 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                 )
                 i_plot += 1
 
-                pyplot.plot(
-                    data_sets[i][:, 0],
-                    data_sets[i][:, 1],
-                    ls="*",
-                    marker=".",
-                    alpha=0.1
-                )
+                # pyplot.plot(
+                #     data_sets[i][:, 0],
+                #     data_sets[i][:, 1],
+                #     ls="*",
+                #     marker=".",
+                #     alpha=0.1
+                # )
                 pyplot.axis([-15, 15, -15, 15])
 
-                print "\titeration: %d" % j
+                output += "\titeration: %d\n" % j
 
                 for k in range(n_clusters):
                     if pis[i][j][k] > pis_threshold:
@@ -132,8 +142,8 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                             sigmas[j][k]
                         )
                         ax.add_artist(ellipse)
-                        print "\t\tclust: %02d, xy: (%.2f, %.2f), " \
-                            "angle: %.2f, weight: %.3f" % (
+                        output += "\t\tclust: %02d, xy: (%.2f, %.2f), " \
+                            "angle: %.2f, weight: %.3f\n" % (
                                 k,
                                 ellipse.center[0],
                                 ellipse.center[1],
@@ -142,7 +152,7 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                             )
 
             # now show the averaged results on this data set
-            print "\taveraged:"
+            output += "\taveraged:\n"
             ax = fig.add_subplot(
                 n_rows,
                 n_columns,
@@ -168,8 +178,8 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                         sigmas_averaged[k]
                     )
                     ax.add_artist(ellipse)
-                    print "\t\tclust: %02d, xy: (%.2f, %.2f), " \
-                        "angle: %.2f, weight: %.3f" % (
+                    output += "\t\tclust: %02d, xy: (%.2f, %.2f), " \
+                        "angle: %.2f, weight: %.3f\n" % (
                             k,
                             ellipse.center[0],
                             ellipse.center[1],
@@ -177,7 +187,20 @@ class HDPMixtureModelTestCase(unittest.TestCase):
                             pis_averaged[i][0][k]
                         )
 
-        pyplot.show()
+            print output
+
+        # pyplot.show()
+        extension = 'pdf'
+        file_name = "hdp_test_%s_p%d_d%d_c%d_i%d_b%d.%s" % (
+            datetime.datetime.now().strftime('%Y%m%d%H%M%S'),
+            n_points,
+            n_data_sets,
+            n_clusters,
+            n_iterations,
+            burn_in,
+            extension
+        )
+        pyplot.savefig(file_name, format=extension)
 
         # there should be n_clusters of rows in both mus and sigmas
         self.assertEqual(mus_averaged.shape[0], sigmas_averaged.shape[0])
