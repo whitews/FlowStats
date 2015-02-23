@@ -780,7 +780,7 @@ class HDPMixture(object):
     __array_priority__ = 10
 
     def __init__(self, pis, mus, sigmas, niter=1, m=0, s=1, identified=False):
-        self.pis = pis.squeeze()
+        self.pis = pis
         self.mus = mus.squeeze()
         self.sigmas = sigmas.squeeze()
         self.niter = niter
