@@ -81,6 +81,9 @@ class HDPMixtureModelTestCase(unittest.TestCase):
         delta_time = time_1 - time_0
         print delta_time.total_seconds()
 
+        # test classify method
+        classifications = results.classify(data_sets[0])
+
         # pis are split by data set, then iteration
         pis = np.array_split(results.pis, n_data_sets)
         for i, p in enumerate(pis):
