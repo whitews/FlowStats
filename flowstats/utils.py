@@ -1,5 +1,3 @@
-from itertools import chain
-from collections import deque
 import numpy as np
 from numpy.linalg import inv, solve
 from scipy.spatial.distance import pdist as _pdist, squareform
@@ -7,30 +5,14 @@ from scipy.spatial.distance import pdist as _pdist, squareform
 from distributions import compmixnormpdf, mixnormpdf, mixnormrnd
 
 
-def bfs(g, start):
-    """BFS generator from start node"""
-    queue, enqueued = deque([(None, start)]), {start}
-    while queue:
-        parent, n = queue.popleft()
-        yield parent, n
-        new = set(g[n]) - enqueued
-        enqueued |= new
-        queue.extend([(n, child) for child in new])
+def find_components(graph):
+    """Find connected components in graph"""
+    components = []
+    for i in graph.values():
+        if set(i) not in components:
+            components.append(set(i))
 
-
-def flatten(list_of_lists):
-    """Flatten one level of nesting"""
-    return chain.from_iterable(list_of_lists)
-
-
-def nodes(collection):
-    """Return unique nodes"""
-    return frozenset(node for node in flatten(collection) if node is not None)
-
-
-def find_components(g):
-    """Find connected components in graph g"""
-    return np.unique(frozenset([nodes(bfs(g, i)) for i in range(len(g))]))
+    return [sorted(c) for c in components]
 
 
 def matrix_to_graph(m):
