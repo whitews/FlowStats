@@ -47,8 +47,8 @@ def mode_search(
         pis,
         mus,
         sigmas,
-        tol=1e-6,
-        max_iterations=20,
+        tol=0.01,
+        max_iterations=100,
         delta=0.1,
         w=None,
         scale=False):
@@ -85,7 +85,7 @@ def mode_search(
     return modes, result
 
 
-def _mode_search(pi, mu, sigma, nk=0, tol=0.000001, max_iterations=20):
+def _mode_search(pi, mu, sigma, nk=0, tol=0.01, max_iterations=100):
     """Search for modes in mixture of Gaussians"""
     k, unused_p = mu.shape
     omega = np.copy(sigma)
