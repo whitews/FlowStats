@@ -198,16 +198,40 @@ class DPMixture(object):
             logged=logged,
             **kwargs)
 
-    def classify(self, x, **kwargs):
+    def classify(self, x, chunk_size=100000, **kwargs):
         """
-        DPMixture.classify(x):
-        returns the classification (which mixture) x is a member of
+        Args:
+            x: NumPy ndarray containing the data to classify
+            chunk_size: classification is divided into pieces of chunk_size
+                        to avoid excessive memory use (esp. important on GPUs)
+        Returns:
+             the classification (which mixture) to which x is a member
         """
-        probs = self.probability(x, logged=True, **kwargs)
+        current_index = 0
+        probabilities = None
+        while current_index < x.shape[0]:
+            if probabilities is None:
+                probabilities = self.probability(
+                    x[:chunk_size],
+                    logged=True,
+                    **kwargs
+                )
+            else:
+                probabilities = np.vstack(
+                    [
+                        probabilities,
+                        self.probability(
+                            x[current_index:current_index + chunk_size],
+                            logged=True,
+                            **kwargs
+                        )
+                    ]
+                )
+            current_index += chunk_size
         try:
-            return probs.argmax(1)
+            return probabilities.argmax(1)
         except ValueError:
-            return probs.argmax(0)
+            return probabilities.argmax(0)
 
     @property
     def mus(self):
