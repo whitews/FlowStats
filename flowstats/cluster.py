@@ -199,7 +199,9 @@ class DPMixtureModel(object):
             seed=None,
             verbose=False,
             normed=False,
-            munkres_id=False):
+            munkres_id=False,
+            callback=None
+    ):
         if isinstance(data, list) or isinstance(data, tuple):
             return [
                 self._fit(
@@ -217,7 +219,9 @@ class DPMixtureModel(object):
                 seed=seed,
                 verbose=verbose,
                 normed=normed,
-                munkres_id=munkres_id)
+                munkres_id=munkres_id,
+                callback=callback
+            )
 
     def _fit(
             self,
@@ -226,7 +230,9 @@ class DPMixtureModel(object):
             seed=None,
             verbose=False,
             normed=False,
-            munkres_id=False):
+            munkres_id=False,
+            callback=None
+    ):
         """
         Fit the mixture model to the data
         use get_results() to get the fitted model
@@ -304,7 +310,9 @@ class DPMixtureModel(object):
                 niter=self.n_iterations,
                 nburn=self.burn_in,
                 thin=1,
-                ident=munkres_id)
+                ident=munkres_id,
+                callback=callback
+            )
 
         if self.last is None:
             self.last = self.n_iterations
@@ -376,7 +384,9 @@ class HDPMixtureModel(DPMixtureModel):
             seed=None,
             verbose=False,
             munkres_id=False,
-            tune_interval=100):
+            tune_interval=100,
+            callback=None
+    ):
         self.d = data_sets[0].shape[1]
 
         data_sets = [i.copy().astype('double') for i in data_sets]
@@ -425,7 +435,9 @@ class HDPMixtureModel(DPMixtureModel):
             nburn=self.burn_in,
             thin=1,
             ident=munkres_id,
-            tune_interval=tune_interval)
+            tune_interval=tune_interval,
+            callback=callback
+        )
 
         pis = np.array(
             [
