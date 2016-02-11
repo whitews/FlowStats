@@ -7,9 +7,9 @@ setup(
     package_data={'': []},
     description='Flow Cytometry Standard Statistical Functions',
     requires=[
-        'numpy>=1.6',
+        'numpy (>=1.6)',
         'scipy',
-        'dpmix==0.4',
+        'dpmix (==0.4)',
         'matplotlib'
     ],
 )
