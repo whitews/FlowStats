@@ -24,19 +24,15 @@ class DPMixtureModel(object):
             n_clusters,
             n_iterations,
             burn_in,
-            model,
-            last=None):
+            model):
         """
         n_clusters = number of clusters to fit
         n_iterations = number of MCMC iterations to sample
         burn_in = number of MCMC burn-in iterations
-        last = number of MCMC iterations to draw samples from
-               (if None, last = n_iterations)
         """
         self.n_clusters = n_clusters
         self.n_iterations = n_iterations
         self.burn_in = burn_in
-        self.last = last
         self.model = model
 
         self.data = None
@@ -314,9 +310,6 @@ class DPMixtureModel(object):
                 callback=callback
             )
 
-        if self.last is None:
-            self.last = self.n_iterations
-
         if self.model.lower() == 'bem':
             results = []
             for j in range(self.n_clusters):
@@ -331,20 +324,20 @@ class DPMixtureModel(object):
             tmp = DPMixture(results, self.m, self.s)
         else:
             results = []
-            for i in range(self.last):
+            for i in range(self.n_iterations):
                 for j in range(self.n_clusters):
                     tmp = DPCluster(
-                        self.cdp.weights[-(i + 1), j],
-                        (self.cdp.mu[-(i + 1), j] * self.s) + self.m,
-                        self.cdp.Sigma[-(i + 1), j] * np.outer(
+                        self.cdp.weights[i, j],
+                        (self.cdp.mu[i, j] * self.s) + self.m,
+                        self.cdp.Sigma[i, j] * np.outer(
                             self.s, self.s),
-                        self.cdp.mu[-(i + 1), j],
-                        self.cdp.Sigma[-(i + 1), j]
+                        self.cdp.mu[i, j],
+                        self.cdp.Sigma[i, j]
                     )
                     results.append(tmp)
             tmp = DPMixture(
                 results,
-                self.last,
+                self.n_iterations,
                 self.m,
                 self.s,
                 munkres_id)
@@ -356,8 +349,6 @@ class HDPMixtureModel(DPMixtureModel):
     n_clusters = number of clusters to fit
     n_iterations = number of MCMC iterations
     burn_in = number of MCMC burn-in iterations
-    last = number of MCMC iterations to draw samples from.
-           (if None, last = n_iterations)
     """
 
     def __init__(self, n_clusters, n_iterations, burn_in):
@@ -365,8 +356,7 @@ class HDPMixtureModel(DPMixtureModel):
             n_clusters,
             n_iterations,
             burn_in,
-            model='hdp',
-            last=None
+            model='hdp'
         )
 
         self.e0 = 1.0
