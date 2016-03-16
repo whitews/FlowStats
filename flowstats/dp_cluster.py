@@ -303,7 +303,7 @@ class DPMixture(object):
         return the log likelihood of x belonging to this mixture
         """
 
-        return np.sum(np.log(np.sum(self.probability(x), axis=0)))
+        return np.sum(np.log(np.sum(self.probability(x), axis=1)))
 
     def draw(self, n):
         """
