@@ -321,7 +321,7 @@ class DPMixtureModel(object):
                     self.cdp.Sigma[j]
                 )
                 results.append(tmp)
-            tmp = DPMixture(results, self.m, self.s)
+            tmp = DPMixture(results, niter=1, m=self.m, s=self.s)
         else:
             results = []
             for i in range(self.n_iterations):
