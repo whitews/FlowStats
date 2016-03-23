@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='FlowStats',
-    version='0.5',
+    version='0.6',
     packages=['flowstats'],
     package_data={'': []},
     description='Flow Cytometry Standard Statistical Functions',
