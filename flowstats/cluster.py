@@ -79,7 +79,7 @@ class DPMixtureModel(object):
             d = mu.shape[0]
         if n > self.n_clusters:
             raise ValueError(
-                'Number of proposed Mus grater then number of clusters')
+                'Number of proposed Mus greater then number of clusters')
 
         self.prior_mu = mu
         self.mu_d = d
@@ -113,7 +113,7 @@ class DPMixtureModel(object):
 
         if n > self.n_clusters:
             raise ValueError(
-                'Number of proposed Sigmas grater then number of clusters')
+                'Number of proposed Sigmas greater then number of clusters')
 
         self._load_sigma = True
         self.prior_sigma = sigma
@@ -367,6 +367,19 @@ class HDPMixtureModel(DPMixtureModel):
         self.n_data_sets = None
         self.hdp = None
 
+    def load_pi(self, pi):
+        """
+        load_pi is not implemented in HDPMixtureModel since it's shape
+        must be verified against the data sets used in the fit method.
+        To specify initial weights use the keyword argument in the fit method.
+
+        Note: load_mu and load_sigma can be called just as they would in a
+              DPMixtureModel instance
+        :param pi:
+        :return: NotImplementedError
+        """
+        raise NotImplementedError("Initial weights should be set in fit()")
+
     def fit(
             self,
             data_sets,
@@ -375,7 +388,8 @@ class HDPMixtureModel(DPMixtureModel):
             verbose=False,
             munkres_id=False,
             tune_interval=100,
-            callback=None
+            callback=None,
+            initial_weights=None
     ):
         self.d = data_sets[0].shape[1]
 
@@ -394,6 +408,16 @@ class HDPMixtureModel(DPMixtureModel):
             self._load_mu_at_fit()
         if self.prior_sigma is not None:
             self._load_sigma_at_fit()
+        if initial_weights is not None:
+            if initial_weights.shape[0] != self.n_data_sets:
+                raise ValueError(
+                    "Initial weights do not match the number of data sets"
+                )
+            if initial_weights.shape[1] != self.n_clusters:
+                raise ValueError(
+                    "Initial weights do not match the number of components"
+                )
+            self._prior_pi = initial_weights
 
         if seed is not None:
             np_seed(seed)
