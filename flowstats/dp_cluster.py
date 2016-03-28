@@ -298,12 +298,19 @@ class DPMixture(object):
                 self.m,
                 self.s)
 
-    def log_likelihood(self, x):
+    def log_likelihood(self, x, use_gpu=False):
         """
         return the log likelihood of x belonging to this mixture
         """
 
-        return np.sum(np.log(np.sum(self.probability(x), axis=1)))
+        return np.sum(
+            np.log(
+                np.sum(
+                    self.probability(x, use_gpu=use_gpu),
+                    axis=1
+                )
+            )
+        )
 
     def draw(self, n):
         """
