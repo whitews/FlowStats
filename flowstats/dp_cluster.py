@@ -402,7 +402,7 @@ class DPMixture(object):
         """
         return a sub model of specific iterations
         x.get_iteration(0) returns a DPMixture of the first iteration
-        x.get_iteration([0,2,4,6]) returs a DPMixture of iterations 0,2,4,6,
+        x.get_iteration([0,2,4,6]) returns a DPMixture of iterations 0,2,4,6,
             eg. poor mans thinning.
         """
         if isinstance(iterations, Number):
@@ -436,7 +436,7 @@ class DPMixture(object):
             print e
             d = 1
 
-        newd = margin.shape[0]
+        new_d = margin.shape[0]
         results = []
         x = np.zeros(d, dtype=np.bool)
 
@@ -451,9 +451,9 @@ class DPMixture(object):
                     DPCluster(
                         i.pi,
                         i.mu[x],
-                        i.sigma[y].reshape(newd, newd),
+                        i.sigma[y].reshape(new_d, new_d),
                         i.centered_mu[x],
-                        i.centered_sigma[y].reshape(newd, newd)
+                        i.centered_sigma[y].reshape(new_d, new_d)
                     )
                 )
             except AttributeError:
@@ -461,7 +461,7 @@ class DPMixture(object):
                     DPCluster(
                         i.pi,
                         i.mu[x],
-                        i.sigma[y].reshape(newd, newd)
+                        i.sigma[y].reshape(new_d, new_d)
                     )
                 )
 
@@ -667,7 +667,7 @@ class ModalDPMixture(DPMixture):
         probabilities = compmixnormpdf(
             x, self.pis, self.mus, self.sigmas, logged=logged, **kwargs)
 
-        #can't sum in log probability space
+        # can't sum in log probability space
 
         try:
             n, j = x.shape  # check we're more than 1 point
@@ -684,7 +684,7 @@ class ModalDPMixture(DPMixture):
                         0
                     )
         except ValueError:
-            #single point
+            # single point
             result = np.zeros((len(self.cmap.keys())))
             for j in self.cmap.keys():
                 if logged:
@@ -826,7 +826,7 @@ class HDPMixture(object):
         if isinstance(key, slice):
             return [self[ii] for ii in xrange(*key.indices(len(self)))]
         elif isinstance(key, int):
-            #Handle negative indices
+            # Handle negative indices
             if key < 0:
                 key += len(self)
             if key >= len(self):
@@ -1120,9 +1120,12 @@ class ModalHDPMixture(HDPMixture):
         pis = self.pis[key, :]
         mus = (self.mus - self.m) / self.s
         sigmas = self.sigmas / np.outer(self.s, self.s)
-        clsts = [DPCluster(i, j, k, l, m) for i, j, k, l, m in
-                 zip(pis, self.mus, self.sigmas, mus, sigmas)]
-        return ModalDPMixture(clsts, self.cmap, self.modemap, self.niter,
+        clusters = [
+            DPCluster(i, j, k, l, m) for i, j, k, l, m in zip(
+                pis, self.mus, self.sigmas, mus, sigmas
+            )
+        ]
+        return ModalDPMixture(clusters, self.cmap, self.modemap, self.niter,
                               self.m, self.s)
 
     @property
