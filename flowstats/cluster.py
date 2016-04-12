@@ -266,7 +266,7 @@ class DPMixtureModel(object):
         else:
             np_seed(datetime.now().microsecond)
 
-        #TODO move hyperparameter settings here
+        # TODO move hyper-parameter settings here
         if self.model.lower() == 'bem':
             self.cdp = BEM_DPNormalMixture(
                 self.data,
@@ -281,7 +281,6 @@ class DPMixtureModel(object):
                 Sigma0=self._prior_sigma,
                 weights0=self._prior_pi,
                 alpha0=self.alpha_0,
-                gpu=device,
                 parallel=self.parallel,
                 verbose=verbose)
             self.cdp.optimize(self.n_iterations, device=device)
@@ -299,7 +298,6 @@ class DPMixtureModel(object):
                 Sigma0=self._prior_sigma,
                 weights0=self._prior_pi,
                 alpha0=self.alpha_0,
-                gpu=device,
                 parallel=self.parallel,
                 verbose=verbose)
             self.cdp.sample(
@@ -440,7 +438,6 @@ class HDPMixtureModel(DPMixtureModel):
             Sigma0=self._prior_sigma,
             weights0=self._prior_pi,
             alpha0=self.alpha_0,
-            gpu=device,
             parallel=self.parallel,
             verbose=verbose)
         if not device:
