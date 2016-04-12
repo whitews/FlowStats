@@ -9,7 +9,7 @@ setup(
     requires=[
         'numpy (>=1.6)',
         'scipy',
-        'dpmix_exp (==0.5a)',
+        'dpmix_exp (==0.5)',
         'matplotlib'
     ],
 )
