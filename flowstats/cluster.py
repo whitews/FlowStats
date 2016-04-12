@@ -9,7 +9,7 @@ from numpy.random import multivariate_normal
 from numpy.random import seed as np_seed
 from datetime import datetime
 
-from dpmix import DPNormalMixture, BEM_DPNormalMixture, HDPNormalMixture
+from dpmix_exp import DPNormalMixture, BEM_DPNormalMixture, HDPNormalMixture
 
 from dp_cluster import DPCluster, DPMixture, HDPMixture
 
@@ -284,7 +284,7 @@ class DPMixtureModel(object):
                 gpu=device,
                 parallel=self.parallel,
                 verbose=verbose)
-            self.cdp.optimize(self.n_iterations)
+            self.cdp.optimize(self.n_iterations, device=device)
         else:
             self.cdp = DPNormalMixture(
                 self.data,
@@ -307,6 +307,7 @@ class DPMixtureModel(object):
                 nburn=self.burn_in,
                 thin=1,
                 ident=munkres_id,
+                device=device,
                 callback=callback
             )
 
@@ -450,6 +451,7 @@ class HDPMixtureModel(DPMixtureModel):
             thin=1,
             ident=munkres_id,
             tune_interval=tune_interval,
+            device=device,
             callback=callback
         )
 
