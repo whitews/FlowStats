@@ -9,7 +9,7 @@ from numpy.random import multivariate_normal
 from numpy.random import seed as np_seed
 from datetime import datetime
 
-from dpmix_exp import DPNormalMixture, BEM_DPNormalMixture, HDPNormalMixture
+from dpmix_exp import DPNormalMixture, BEMNormalMixture, HDPNormalMixture
 
 from dp_cluster import DPCluster, DPMixture, HDPMixture
 
@@ -268,7 +268,7 @@ class DPMixtureModel(object):
 
         # TODO move hyper-parameter settings here
         if self.model.lower() == 'bem':
-            self.cdp = BEM_DPNormalMixture(
+            self.cdp = BEMNormalMixture(
                 self.data,
                 ncomp=self.n_clusters,
                 gamma0=self.gamma_0,
