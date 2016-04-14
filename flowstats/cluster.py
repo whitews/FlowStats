@@ -38,7 +38,6 @@ class DPMixtureModel(object):
         self.data = None
         self.cdp = None
 
-        self.gamma_0 = 10
         self.m_0 = None
         self.alpha_0 = 1
         self.nu_0 = None
@@ -196,6 +195,7 @@ class DPMixtureModel(object):
             verbose=False,
             normed=False,
             munkres_id=False,
+            gamma=None,
             callback=None
     ):
         if isinstance(data, list) or isinstance(data, tuple):
@@ -206,7 +206,8 @@ class DPMixtureModel(object):
                     seed=seed,
                     verbose=verbose,
                     normed=normed,
-                    munkres_id=munkres_id) for i in data
+                    munkres_id=munkres_id,
+                    gamma=gamma) for i in data
             ]
         else:
             return self._fit(
@@ -216,6 +217,7 @@ class DPMixtureModel(object):
                 verbose=verbose,
                 normed=normed,
                 munkres_id=munkres_id,
+                gamma=gamma,
                 callback=callback
             )
 
@@ -227,6 +229,7 @@ class DPMixtureModel(object):
             verbose=False,
             normed=False,
             munkres_id=False,
+            gamma=None,
             callback=None
     ):
         """
@@ -247,6 +250,10 @@ class DPMixtureModel(object):
 
         if len(self.data.shape) == 1:
             self.data = self.data.reshape((self.data.shape[0], 1))
+
+        if gamma is None:
+            # find max standardized value to use for gamma
+            gamma = np.abs(self.data).max()
 
         if len(self.data.shape) != 2:
             raise ValueError("points array is the wrong shape")
@@ -271,7 +278,7 @@ class DPMixtureModel(object):
             self.cdp = BEMNormalMixture(
                 self.data,
                 ncomp=self.n_clusters,
-                gamma0=self.gamma_0,
+                gamma0=gamma,
                 m0=self.m_0,
                 nu0=self.nu_0,
                 Phi0=self.phi_0,
@@ -282,13 +289,14 @@ class DPMixtureModel(object):
                 weights0=self._prior_pi,
                 alpha0=self.alpha_0,
                 parallel=self.parallel,
-                verbose=verbose)
+                verbose=verbose
+            )
             self.cdp.optimize(self.n_iterations, device=device)
         else:
             self.cdp = DPNormalMixture(
                 self.data,
                 ncomp=self.n_clusters,
-                gamma0=self.gamma_0,
+                gamma0=gamma,
                 m0=self.m_0,
                 nu0=self.nu_0,
                 Phi0=self.phi_0,
@@ -387,8 +395,9 @@ class HDPMixtureModel(DPMixtureModel):
             verbose=False,
             munkres_id=False,
             tune_interval=100,
-            callback=None,
-            initial_weights=None
+            initial_weights=None,
+            gamma=None,
+            callback=None
     ):
         self.d = data_sets[0].shape[1]
 
@@ -402,6 +411,14 @@ class HDPMixtureModel(DPMixtureModel):
             if i.shape[1] != self.d:
                 raise RuntimeError("Shape of data sets do not match")
             standardized.append(((i - self.m) / self.s))
+
+        if gamma is None:
+            # find max standardized value to use for gamma
+            gamma = 0
+            for i in standardized:
+                i_max = np.abs(i).max()
+                if i_max > gamma:
+                    gamma = i_max
 
         if self.prior_mu is not None:
             self._load_mu_at_fit()
@@ -426,7 +443,7 @@ class HDPMixtureModel(DPMixtureModel):
         self.hdp = HDPNormalMixture(
             standardized,
             ncomp=self.n_clusters,
-            gamma0=self.gamma_0,
+            gamma0=gamma,
             m0=self.m_0,
             nu0=self.nu_0,
             Phi0=self.phi_0,
