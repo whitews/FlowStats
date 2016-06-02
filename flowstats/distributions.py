@@ -8,14 +8,14 @@ from scipy.misc import logsumexp
 
 try:
     from gpustats import mvnpdf_multi
-    from dpmix.utils import select_gpu
+    from dpmix_exp.utils import select_gpu
     has_gpu = True
 except ImportError:
     has_gpu = False
     mvnpdf_multi = None
     select_gpu = None
 
-from dpmix.utils import mvn_weighted_logged
+from dpmix_exp.utils import mvn_weighted_logged
 
 
 def _mvnpdf(x, mu, va, logged=False, use_gpu=True, **kwargs):
