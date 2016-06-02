@@ -195,7 +195,7 @@ class DPMixtureModel(object):
             verbose=False,
             normed=False,
             munkres_id=False,
-            gamma=None,
+            gamma=10,
             callback=None
     ):
         if isinstance(data, list) or isinstance(data, tuple):
@@ -229,7 +229,7 @@ class DPMixtureModel(object):
             verbose=False,
             normed=False,
             munkres_id=False,
-            gamma=None,
+            gamma=10,
             callback=None
     ):
         """
@@ -250,10 +250,6 @@ class DPMixtureModel(object):
 
         if len(self.data.shape) == 1:
             self.data = self.data.reshape((self.data.shape[0], 1))
-
-        if gamma is None:
-            # find max standardized value to use for gamma
-            gamma = np.abs(self.data).max()
 
         if len(self.data.shape) != 2:
             raise ValueError("points array is the wrong shape")
@@ -396,7 +392,7 @@ class HDPMixtureModel(DPMixtureModel):
             munkres_id=False,
             tune_interval=100,
             initial_weights=None,
-            gamma=None,
+            gamma=10,
             callback=None
     ):
         self.d = data_sets[0].shape[1]
@@ -411,14 +407,6 @@ class HDPMixtureModel(DPMixtureModel):
             if i.shape[1] != self.d:
                 raise RuntimeError("Shape of data sets do not match")
             standardized.append(((i - self.m) / self.s))
-
-        if gamma is None:
-            # find max standardized value to use for gamma
-            gamma = 0
-            for i in standardized:
-                i_max = np.abs(i).max()
-                if i_max > gamma:
-                    gamma = i_max
 
         if self.prior_mu is not None:
             self._load_mu_at_fit()
