@@ -669,8 +669,11 @@ class ModalDPMixture(DPMixture):
 
         # can't sum in log probability space
 
-        try:
-            n, j = x.shape  # check we're more than 1 point
+        # check we're more than 1 point
+        n, j = x.shape
+
+        if n > 1:
+            # more than 1 point
             result = np.zeros((n, len(self.cmap.keys())))
             for j in self.cmap.keys():
                 if logged:
@@ -683,7 +686,7 @@ class ModalDPMixture(DPMixture):
                         [probabilities[:, i] for i in self.cmap[j]],
                         0
                     )
-        except ValueError:
+        else:
             # single point
             result = np.zeros((len(self.cmap.keys())))
             for j in self.cmap.keys():
@@ -727,10 +730,15 @@ class ModalDPMixture(DPMixture):
         returns the classification (which mixture) x is a member of
         """
         probabilities = self.probability(x, logged=True, **kwargs)
-        try:
+
+        n, j = x.shape
+
+        if n > 1:
+            # more than 1 data point
             return probabilities.argmax(1)
-        except ValueError:
-            return probabilities.argmax(0)
+        else:
+            # single point
+            return [probabilities.argmax(0)]
 
     def reorder(self, lookup):
         return OrderedModalDPMixture(
