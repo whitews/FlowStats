@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv, solve
 from scipy.spatial.distance import pdist as _pdist, squareform
 
-from distributions import compmixnormpdf, mixnormpdf, mixnormrnd
+from .distributions import compmixnormpdf, mixnormpdf, mixnormrnd
 
 
 def find_components(graph):
@@ -33,10 +33,10 @@ def point_distribution(x, weight=None, scale=False):
     n, p = x.shape
     if weight is not None:
         weight = np.sqrt(weight)
-        print weight
-        print x
+        print(weight)
+        print(x)
         x = x * weight
-        print x
+        print(x)
     if scale:
         return (1.0 / np.sqrt(p)) * squareform(_pdist(x, 'euclidean'))
     else:

@@ -11,8 +11,8 @@ from numbers import Number
 from warnings import warn
 from copy import deepcopy
 
-from distributions import compmixnormpdf
-from utils import mode_search
+from .distributions import compmixnormpdf
+from .utils import mode_search
 
 
 class DPCluster(object):
@@ -338,7 +338,7 @@ class DPMixture(object):
             warn("Model was run with identified=False, therefore these averages"
                  " are likely meaningless")
 
-        k = len(self.clusters) / self.niter
+        k = int(len(self.clusters) / self.niter)
         results = []
         if self.m is None:
             m = 0
@@ -432,8 +432,8 @@ class DPMixture(object):
             margin = np.array([margin]).reshape(-1)
         try:
             d = self.mus.shape[1]
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             d = 1
 
         new_d = margin.shape[0]
@@ -709,7 +709,7 @@ class ModalDPMixture(DPMixture):
         return an array of mode locations
         """
         lst = []
-        for i in self.modemap.itervalues():
+        for i in self.modemap.values():
             try:
                 lst.append((np.array(i) * self.s) + self.m)
             except AttributeError:
@@ -718,7 +718,7 @@ class ModalDPMixture(DPMixture):
 
     @property
     def centered_modes(self):
-        return np.array([i for i in self.modemap.itervalues()])
+        return np.array([i for i in self.modemap.values()])
 
     def enumerate_modes(self):
         for i in range(len(self.modes)):
@@ -832,7 +832,7 @@ class HDPMixture(object):
 
     def __getitem__(self, key):
         if isinstance(key, slice):
-            return [self[ii] for ii in xrange(*key.indices(len(self)))]
+            return [self[ii] for ii in range(*key.indices(len(self)))]
         elif isinstance(key, int):
             # Handle negative indices
             if key < 0:
@@ -941,7 +941,7 @@ class HDPMixture(object):
         return np.array([i.classify(x, **kwargs) for i in self])
 
     def average(self):
-        offset = self.mus.shape[0] / self.niter
+        offset = int(self.mus.shape[0] / self.niter)
         d = self.mus.shape[1]
         new_mus = self.mus.reshape(
             self.niter, offset, d).mean(0).squeeze()
@@ -1143,7 +1143,7 @@ class ModalHDPMixture(HDPMixture):
         return an array of mode locations
         """
         lst = []
-        for i in self.modemap.itervalues():
+        for i in self.modemap.values():
             try:
                 lst.append((np.array(i) * self.s) + self.m)
             except AttributeError:

@@ -11,7 +11,7 @@ from datetime import datetime
 
 from dpmix_exp import DPNormalMixture, BEMNormalMixture, HDPNormalMixture
 
-from dp_cluster import DPCluster, DPMixture, HDPMixture
+from .dp_cluster import DPCluster, DPMixture, HDPMixture
 
 
 class DPMixtureModel(object):
@@ -24,7 +24,7 @@ class DPMixtureModel(object):
             n_clusters,
             n_iterations,
             burn_in,
-            model):
+            model='dp'):
         """
         n_clusters = number of clusters to fit
         n_iterations = number of MCMC iterations to sample
@@ -174,8 +174,8 @@ class DPMixtureModel(object):
                     self.prior_sigma[i] = np.cov(
                         points[self._ref == i],
                         rowvar=0)
-                except Exception, e:
-                    print e
+                except Exception as e:
+                    print(e)
                     self.prior_mu[i] = np.zeros(points.shape[1])
                     self.prior_sigma[i] = np.eye(points.shape[1])
 
@@ -245,7 +245,11 @@ class DPMixtureModel(object):
             self.m = points.mean(0)
             self.s = points.std(0)
             # in case any of the std's are zero
-            self.s[self.s == 0] = 1
+            if type(self.s) == np.float64:
+                if self.s == 0:
+                    self.s = 1
+            else:
+                self.s[self.s == 0] = 1
             self.data = (points - self.m) / self.s
 
         if len(self.data.shape) == 1:
